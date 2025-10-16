@@ -1,0 +1,135 @@
+from collections import deque
+from typing import Set
+from DependencyGraph import DependencyGraph
+
+
+class DependencyAnalyzer:
+    def __init__(self, repository, max_depth: int = 5, filter_str: str = ""):
+        self.repository = repository
+        self.max_depth = max_depth
+        self.filter_str = filter_str.lower()
+        self.graph = DependencyGraph()
+        self.visited = set()
+        self.cycles_detected = []
+
+    def should_include_package(self, package_name: str) -> bool:
+        if self.filter_str and self.filter_str in package_name.lower():
+            return False
+        return True
+
+    def analyze_dependencies(self, root_package: str) -> DependencyGraph:
+        print(f"\nНачинаем анализ зависимостей для {root_package}...")
+        print(f"   Максимальная глубина: {self.max_depth}")
+        print(f"   Фильтр: '{self.filter_str}'" if self.filter_str else "   Фильтр: не используется")
+
+        stack = deque()
+        stack.append((root_package, 0))
+
+        while stack:
+            package_name, depth = stack.pop()
+
+            if depth > self.max_depth:
+                print(f"   Пропускаем {package_name} (превышена глубина {self.max_depth})")
+                continue
+
+            if not self.should_include_package(package_name):
+                print(f"   Пропускаем {package_name} (фильтр: '{self.filter_str}')")
+                continue
+
+            # Если уже посещали этот пакет, проверяем на циклы
+            if package_name in self.visited:
+                # Проверяем, создает ли это цикл
+                if any(package_name in path for path in self.cycles_detected):
+                    print(f"   Обнаружен цикл с пакетом {package_name}")
+                continue
+
+            self.visited.add(package_name)
+            print(f"   Анализируем {package_name} (глубина {depth})")
+
+            try:
+                # Получаем информацию о пакете
+                package = self.repository.get_package(package_name)
+                self.graph.add_package(package_name, package.get('version', '1.0.0'), package.get('dependencies', []))
+
+                # Получаем зависимости
+                dependencies = self.repository.get_dependencies(package_name)
+
+                for dep_name in dependencies:
+                    # Проверяем фильтр для зависимости
+                    if not self.should_include_package(dep_name):
+                        print(f"      Пропускаем зависимость {dep_name} (фильтр)")
+                        continue
+
+                    self.graph.add_dependency(package_name, dep_name)
+
+                    # Добавляем зависимость в стек для дальнейшего анализа
+                    if dep_name not in self.visited:
+                        stack.append((dep_name, depth + 1))
+                        print(f"      Добавляем зависимость: {dep_name}")
+                    else:
+                        print(f"      Зависимость {dep_name} уже анализировалась")
+
+            except Exception as e:
+                print(f"   Ошибка при анализе {package_name}: {e}")
+                continue
+
+        # Проверяем циклы после построения графа
+        if self.graph.has_cycle():
+            self.cycles_detected = self.graph.get_cycles()
+            print(f"\nОбнаружены циклические зависимости!")
+            for i, cycle in enumerate(self.cycles_detected, 1):
+                print(f"   Цикл {i}: {' -> '.join(cycle)} -> {cycle[0]}")
+
+        return self.graph
+
+    def display_analysis_results(self, root_package: str):
+        print(f"\nРЕЗУЛЬТАТЫ АНАЛИЗА {root_package}:")
+        print(f"\nВсего пакетов в графе: {len(self.graph.nodes)}")
+        print(f"Всего зависимостей: {sum(len(deps) for deps in self.graph.edges.values())}")
+        print(f"Максимальная глубина анализа: {self.max_depth}")
+
+        if self.cycles_detected:
+            print(f"Обнаружено циклов: {len(self.cycles_detected)}")
+        else:
+            print("Циклические зависимости: не обнаружены")
+
+        if self.filter_str:
+            print(f"Применен фильтр: '{self.filter_str}'")
+
+        # Показываем граф в виде дерева
+        print(f"\nГРАФ ЗАВИСИМОСТЕЙ:")
+        self._display_tree(root_package)
+        print("=" * 50)
+
+    def _display_tree(self, root: str, visited: Set = None, prefix: str = "", is_last: bool = True):
+        if visited is None:
+            visited = set()
+
+        if root in visited:
+            print(f"{prefix}↳ {root} [ЦИКЛ]")
+            return
+
+        visited.add(root)
+
+        # Выводим текущий узел
+        if prefix == "":
+            print(f"    {root}")
+        else:
+            connector = "└── " if is_last else "├── "
+            print(f"{prefix}{connector}{root}")
+
+        # Получаем зависимости и сортируем для consistent отображения
+        dependencies = sorted(self.graph.get_dependencies(root))
+
+        # Выводим зависимости
+        for i, dep in enumerate(dependencies):
+            is_last_child = i == len(dependencies) - 1
+            new_prefix = prefix + ("    " if is_last else "│   ")
+
+            if dep in visited:
+                connector = "└── " if is_last_child else "├── "
+                print(f"{new_prefix}{connector}↳ {dep} [ЦИКЛ]")
+            else:
+                self._display_tree(dep, visited.copy(), new_prefix, is_last_child)
+
+        visited.remove(root)

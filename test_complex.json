@@ -1,0 +1,10 @@
+{
+  "React": ["ReactDOM", "Scheduler"],
+  "ReactDOM": ["React"],
+  "Scheduler": [],
+  "Vue": ["Compiler", "Runtime"],
+  "Compiler": ["Parser"],
+  "Runtime": ["Reactivity"],
+  "Parser": [],
+  "Reactivity": []
+}
