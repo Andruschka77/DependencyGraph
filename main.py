@@ -1,10 +1,100 @@
 import argparse
 import sys
 import os
+import urllib.request
+import urllib.error
+import json
+from typing import List, Dict
+
+def get_npm_dependencies(package_name: str, registry_url: str) -> List[str]:
+    try:
+        # Формируем URL для запроса информации о пакете
+        url = f"{registry_url.rstrip('/')}/{package_name}"
+
+        print(f"Запрос информации о пакете {package_name}...")
+        print(f"URL: {url}")
+
+        # Создаем запрос с заголовками
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'DependencyVisualizer/1.0',
+                'Accept': 'application/json'
+            }
+        )
+
+        # Выполняем HTTP запрос
+        with urllib.request.urlopen(req, timeout=30) as response:
+            if response.status != 200:
+                raise Exception(f"HTTP ошибка: {response.status}")
+
+            data = json.loads(response.read().decode('utf-8'))
+
+        # Извлекаем информацию о последней версии
+        if 'dist-tags' in data and 'latest' in data['dist-tags']:
+            latest_version = data['dist-tags']['latest']
+        else:
+            # Если нет latest тега, берем последнюю версию из списка
+            versions = list(data.get('versions', {}).keys())
+            if not versions:
+                raise Exception("Не найдено ни одной версии пакета")
+            latest_version = sorted(versions)[-1]
+
+        # Получаем данные о конкретной версии
+        version_data = data['versions'].get(latest_version)
+        if not version_data:
+            raise Exception(f"Данные для версии {latest_version} не найдены")
+
+        # Извлекаем зависимости
+        dependencies = []
+
+        # Проверяем разные типы зависимостей
+        dependency_sections = ['dependencies', 'peerDependencies', 'optionalDependencies']
+
+        for section in dependency_sections:
+            if section in version_data and version_data[section]:
+                for dep_name, dep_version in version_data[section].items():
+                    dependencies.append({
+                        'name': dep_name,
+                        'version': dep_version,
+                        'type': section.replace('Dependencies', '')
+                    })
+
+        print(f"Найдена версия: {latest_version}")
+        return dependencies
+
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise Exception(f"Пакет '{package_name}' не найден в репозитории")
+        else:
+            raise Exception(f"HTTP ошибка при запросе пакета: {e.code}")
+    except urllib.error.URLError as e:
+        raise Exception(f"Ошибка сети: {e.reason}")
+    except json.JSONDecodeError as e:
+        raise Exception(f"Ошибка разбора JSON ответа: {e}")
+    except Exception as e:
+        raise Exception(f"Ошибка при получении зависимостей: {e}")
+
+
+def display_dependencies(package_name: str, dependencies: List[Dict]):
+    print(f"ПРЯМЫЕ ЗАВИСИМОСТИ ПАКЕТА - {package_name}:")
+
+    if not dependencies:
+        print("\nУ этого пакета нет зависимостей")
+        print("=" * 50)
+        return
+
+    # Простой вывод без группировки - сначала убедимся что зависимости есть
+    print("\nВСЕ ЗАВИСИМОСТИ:")
+    for i, dep in enumerate(dependencies, 1):
+        print(f"   {i:2d}. {dep['name']} — {dep['version']}")
+
+    print(f"\nВсего зависимостей: {len(dependencies)}")
+    print("=" * 50)
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Настройка визуализатора зависимостей (Этап 1)'
+        description='Настройка визуализатора зависимостей'
     )
 
     parser.add_argument(
@@ -55,7 +145,7 @@ def main():
     try:
         args = parser.parse_args()
     except SystemExit:
-        print("\n💡 Подсказка: используйте --help чтобы увидеть все параметры")
+        print("\nПодсказка: используйте --help чтобы увидеть все параметры")
         sys.exit(1)
 
     errors = []
@@ -106,23 +196,22 @@ def main():
         print("\nИсправьте ошибки и попробуйте снова")
         sys.exit(1)
 
-    print("=" * 50)
-    print("НАСТРОЙКИ КОТОРЫЕ ВЫ ВЫБРАЛИ:")
-    print("=" * 50)
-    print(f"Пакет для анализа: {args.package}")
+    if args.url and not args.test_mode:
+        print("\nЭТАП 2:")
+        print("=" * 50)
 
-    if args.url:
-        print(f"Источник данных:   URL репозитория")
-        print(f"URL:               {args.url}")
-    else:
-        print(f"Источник данных:   Файл")
-        print(f"Файл:              {args.file}")
+        try:
+            dependencies = get_npm_dependencies(args.package, args.url)
+            display_dependencies(args.package, dependencies)
 
-    print(f"Тестовый режим:    {'Да' if args.test_mode else 'Нет'}")
-    print(f"ASCII-дерево:      {'Да' if args.ascii_tree else 'Нет'}")
-    print(f"Макс. глубина:     {args.max_depth}")
-    print(f"Фильтр:            '{args.filter}'" if args.filter else "Фильтр:            не используется")
-    print("=" * 50)
+        except Exception as e:
+            print(f"\nОшибка при получении зависимостей: {e}")
+            print("\nПроверьте:")
+            print("   • Правильность имени пакета")
+            print("   • Доступность npm registry")
+            print("   • Интернет-соединение")
+            print("=" * 50)
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
