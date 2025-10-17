@@ -101,6 +101,39 @@ class DependencyAnalyzer:
         self._display_tree(root_package)
         print("=" * 50)
 
+    def display_load_order(self, root_package: str):
+        print(f"ПОРЯДОК ЗАГРУЗКИ ЗАВИСИМОСТЕЙ ДЛЯ {root_package}:")
+
+        try:
+            # Топологическая сортировка (наш алгоритм)
+            load_order = self.graph.get_load_order(root_package)
+            print("\nНаш алгоритм (топологическая сортировка):")
+            for i, package in enumerate(load_order, 1):
+                print(f"   {i:2d}. {package}")
+
+            # Уровни зависимостей (BFS-based)
+            print("\nУровни зависимостей (BFS):")
+            levels = self.graph.get_dependency_levels(root_package)
+            for level in sorted(levels.keys()):
+                packages = levels[level]
+                level_name = "Корневой пакет" if level == 0 else f"Уровень {level}"
+                print(f"   {level_name}: {', '.join(sorted(packages))}")
+
+            # Сравнение с реальными менеджерами пакетов
+            print("\nСРАВНЕНИЕ С РЕАЛЬНЫМИ МЕНЕДЖЕРАМИ ПАКЕТОВ:")
+            print("   • npm/yarn: обычно используют BFS-подобный подход")
+            print("   • Наш алгоритм: использует DFS с пост-порядком (зависимости загружаются первыми)")
+            print("   • Расхождения возможны из-за:")
+            print("     - Разных алгоритмов обхода графа")
+            print("     - Обработки опциональных зависимостей")
+            print("     - Параллельной загрузки в реальных менеджерах")
+
+            if self.cycles_detected:
+                print("\n  Внимание: наличие циклов может влиять на порядок загрузки!")
+
+        except Exception as e:
+            print(f"   Ошибка при определении порядка загрузки: {e}")
+
     def _display_tree(self, root: str, visited: Set = None, prefix: str = "", is_last: bool = True):
         if visited is None:
             visited = set()

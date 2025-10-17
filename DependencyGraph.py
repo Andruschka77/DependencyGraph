@@ -1,5 +1,5 @@
 from typing import Dict, Set, List
-
+from collections import deque
 
 class DependencyGraph:
     def __init__(self):
@@ -76,3 +76,49 @@ class DependencyGraph:
                 find_cycles_dfs(node, visited, [], cycles)
 
         return cycles
+
+    def get_load_order(self, root_package: str) -> List[str]:
+        visited = set()
+        result = []
+        in_stack = set()
+
+        def dfs(node):
+            if node in in_stack:
+                # Обнаружен цикл - пропускаем узел
+                return
+            if node in visited:
+                return
+
+            visited.add(node)
+            in_stack.add(node)
+
+            # Сначала посещаем все зависимости
+            for dep in sorted(self.get_dependencies(node)):
+                dfs(dep)
+
+            # Затем добавляем текущий узел
+            result.append(node)
+            in_stack.remove(node)
+
+        dfs(root_package)
+        return result
+
+    def get_dependency_levels(self, root_package: str) -> Dict[int, List[str]]:
+        levels = {}
+        queue = deque([(root_package, 0)])
+        visited = set([root_package])
+
+        while queue:
+            node, level = queue.popleft()
+
+            if level not in levels:
+                levels[level] = []
+            levels[level].append(node)
+
+            # Добавляем зависимости текущего узла
+            for dep in sorted(self.get_dependencies(node)):
+                if dep not in visited:
+                    visited.add(dep)
+                    queue.append((dep, level + 1))
+
+        return levels

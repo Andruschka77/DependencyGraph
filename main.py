@@ -49,6 +49,13 @@ def main():
         help='Фильтровать пакеты по названию (например: "test" чтобы исключить тестовые пакеты)'
     )
 
+    # НОВЫЙ АРГУМЕНТ ДЛЯ ЭТАПА 4
+    parser.add_argument(
+        '--load-order',
+        action='store_true',
+        help='Показать порядок загрузки зависимостей (этап 4)'
+    )
+
     try:
         args = parser.parse_args()
     except SystemExit:
@@ -98,11 +105,6 @@ def main():
     print("\nЭТАП 3:")
     print("=" * 50)
 
-    if args.file or args.test_mode:
-        FileRepository(args.file)
-    else:
-        NPMRepository(args.url)
-
     try:
         if args.file or args.test_mode:
             print("Используется файловый репозиторий")
@@ -120,8 +122,14 @@ def main():
         # Запускаем анализ графа зависимостей
         analyzer.analyze_dependencies(args.package)
 
-        # Показываем результаты
+        # Показываем результаты этапа 3
         analyzer.display_analysis_results(args.package)
+
+        if args.load_order:
+            print("\nЭТАП 4:")
+            print("=" * 50)
+            analyzer.display_load_order(args.package)
+            print("=" * 50)
 
     except Exception as e:
         print(f"\nОшибка при построении графа: {e}")
