@@ -3,11 +3,13 @@ import urllib.error
 import json
 from typing import List, Dict
 
+# Класс для получения информации о пакетах из NPM registry
 class NPMRepository:
     def __init__(self, registry_url: str = "https://registry.npmjs.org"):
         self.registry_url = registry_url
-        self._cache = {}  # Кэш для уже запрошенных пакетов
+        self._cache = {}  # Кэш для уменьшения количества запросов
 
+    # Получает полную информацию о пакете
     def get_package(self, package_name: str) -> Dict:
         dependencies = self._get_npm_dependencies(package_name)
         return {
@@ -15,10 +17,12 @@ class NPMRepository:
             'dependencies': dependencies
         }
 
+    # Получает список зависимостей пакета
     def get_dependencies(self, package_name: str) -> List[str]:
         dependencies = self._get_npm_dependencies(package_name)
         return [dep['name'] for dep in dependencies]
 
+    # Внутренний метод для получения зависимостей из NPM API
     def _get_npm_dependencies(self, package_name: str) -> List[Dict]:
         # Проверяем кэш
         if package_name in self._cache:
@@ -26,11 +30,13 @@ class NPMRepository:
             return self._cache[package_name]
 
         try:
+            # Формируем URL для запроса
             url = f"{self.registry_url.rstrip('/')}/{package_name}"
 
             print(f"   Запрос информации о пакете {package_name}...")
             print(f"   URL: {url}")
 
+            # Создаем HTTP запрос с заголовками
             req = urllib.request.Request(
                 url,
                 headers={
@@ -39,12 +45,14 @@ class NPMRepository:
                 }
             )
 
+            # Выполняем запрос
             with urllib.request.urlopen(req, timeout=30) as response:
                 if response.status != 200:
                     raise Exception(f"HTTP ошибка: {response.status}")
-
+                # Читаем и парсим json ответ
                 data = json.loads(response.read().decode('utf-8'))
 
+            # Определяем последнюю версию
             if 'dist-tags' in data and 'latest' in data['dist-tags']:
                 latest_version = data['dist-tags']['latest']
             else:
@@ -53,12 +61,11 @@ class NPMRepository:
                     raise Exception("Не найдено ни одной версии пакета")
                 latest_version = sorted(versions)[-1]
 
-            version_data = data['versions'].get(latest_version)
+            version_data = data['versions'].get(latest_version) # Получаем данные конкретной версии
             if not version_data:
                 raise Exception(f"Данные для версии {latest_version} не найдены")
 
-            dependencies = []
-
+            dependencies = [] # Собираем все типы зависимостей
             dependency_sections = ['dependencies', 'peerDependencies', 'optionalDependencies']
 
             for section in dependency_sections:

@@ -5,16 +5,28 @@ from DependencyAnalyzer import DependencyAnalyzer
 from NPMRepository import NPMRepository
 from FileRepository import FileRepository
 
+
 def main():
-    parser = argparse.ArgumentParser(description='Анализатор зависимостей пакетов')
-    parser.add_argument('--package', type=str, required=True, help='Имя пакета для анализа (например: react, lodash, express)')
+    # Создаем парсер аргументов командной строки
+    parser = argparse.ArgumentParser(description='Анализатор и визуализатор зависимостей пакетов')
+
+    # Обязательные аргументы
+    parser.add_argument('--package', type=str, required=True, help='Имя пакета для анализа')
+
+    # Взаимоисключающая группа (либо URL, либо файл)
     source_group = parser.add_mutually_exclusive_group(required=True)
-    source_group.add_argument('--url', type=str, help='URL репозитория (например: https://registry.npmjs.org)')
-    source_group.add_argument('--file', type=str, help='Путь к файлу с тестовыми данными (например: test_repo.json)')
+    source_group.add_argument('--url', type=str, help='URL репозитория')
+    source_group.add_argument('--file', type=str, help='Путь к файлу с тестовыми данными')
+
+    # Опциональные аргументы
     parser.add_argument('--test-mode', action='store_true', help='Включить тестовый режим работы')
     parser.add_argument('--max-depth', type=int, default=5, help='Максимальная глубина поиска зависимостей')
-    parser.add_argument('--filter', type=str, default='', help='Фильтровать пакеты по названию (например: "test" чтобы исключить тестовые пакеты)')
-    parser.add_argument('--load-order', action='store_true', help='Показать порядок загрузки зависимостей')
+    parser.add_argument('--filter', type=str, default='', help='Фильтровать пакеты по названию')
+
+    # Аргументы для визуализации
+    parser.add_argument('--visualize', action='store_true', help='Визуализировать граф зависимостей')
+    parser.add_argument('--ascii-tree', action='store_true', help='Показать ASCII-дерево зависимостей')
+    parser.add_argument('--generate-image', action='store_true', help='Сгенерировать изображение графа')
 
     try:
         args = parser.parse_args()
@@ -22,39 +34,22 @@ def main():
         print("\nИспользуйте --help чтобы увидеть все параметры")
         sys.exit(1)
 
+    # Проверки и обработка ошибок
     errors = []
     warnings = []
 
-    # Проверка имени пакета
     if not args.package.strip():
         errors.append("Имя пакета не может быть пустым")
-
-    if len(args.package) > 100:
-        errors.append("Имя пакета слишком длинное")
-
-    # Проверка URL
-    if args.url:
-        if not args.url.startswith(('http://', 'https://')):
-            errors.append("URL должен начинаться с http:// или https://")
-
-    # Проверка файла
-    if args.file:
-        if not os.path.exists(args.file):
-            errors.append(f"Файл '{args.file}' не существует")
-        elif not args.file.lower().endswith('.json'):
-            warnings.append("Рекомендуется использовать .json файлы")
-
-    # Проверка глубины
+    if args.url and not args.url.startswith(('http://', 'https://')):
+        errors.append("URL должен начинаться с http:// или https://")
+    if args.file and not os.path.exists(args.file):
+        errors.append(f"Файл '{args.file}' не существует")
     if args.max_depth <= 0:
         errors.append("Глубина должна быть больше 0")
-    elif args.max_depth > 20:
-        warnings.append("Большая глубина может работать медленно")
 
-    # Показываем предупреждения
+    # Выводим предупреждения и ошибки
     for warning in warnings:
         print(f"Предупреждение: {warning}")
-
-    # Если есть ошибки - показываем и выходим
     if errors:
         print("\nОшибки в параметрах:")
         for error in errors:
@@ -62,38 +57,36 @@ def main():
         print("\nИсправьте ошибки и попробуйте снова")
         sys.exit(1)
 
-    print("\nЭТАП 3:")
-    print("=" * 50)
+    print("\nЭТАП 5")
+    print("=" * 60)
 
     try:
         if args.file or args.test_mode:
-            print("Используется файловый репозиторий")
+            # Используем файловый репозиторий для тестовых данных
             repository = FileRepository(args.file)
         else:
-            print("Используется npm репозиторий")
+            # Используем NPM репозиторий для реальных данных
             repository = NPMRepository(args.url)
 
         analyzer = DependencyAnalyzer(
-            repository=repository,
-            max_depth=args.max_depth,
-            filter_str=args.filter
+            repository=repository, # Источник данных
+            max_depth=args.max_depth, # Макс. глубина анализа
+            filter_str=args.filter # Фильтр пакетов
         )
 
-        # Запускаем анализ графа зависимостей
+        # Запускаем анализ зависимостей
         analyzer.analyze_dependencies(args.package)
 
-        # Показываем результаты этапа 3
-        analyzer.display_analysis_results(args.package)
-
-        if args.load_order:
-            print("\nЭТАП 4:")
-            print("=" * 50)
-            analyzer.display_load_order(args.package)
-            print("=" * 50)
+        # Визуализация результатов
+        if args.visualize or args.ascii_tree or args.generate_image:
+            analyzer.visualize_dependencies(
+                args.package,
+                ascii_tree=args.ascii_tree, # Показать ASCII-дерево
+                generate_image=args.generate_image # Сгенерировать изображение
+            )
 
     except Exception as e:
-        print(f"\nОшибка при построении графа: {e}")
-        print("=" * 50)
+        print(f"\nОшибка: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

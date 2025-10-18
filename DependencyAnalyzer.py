@@ -1,38 +1,41 @@
 from collections import deque
 from typing import Set
 from DependencyGraph import DependencyGraph
+from DependencyVisualizer import DependencyVisualizer
 
-
+# Основной класс для анализа зависимостей пакетов
 class DependencyAnalyzer:
     def __init__(self, repository, max_depth: int = 5, filter_str: str = ""):
-        self.repository = repository
-        self.max_depth = max_depth
-        self.filter_str = filter_str.lower()
-        self.graph = DependencyGraph()
-        self.visited = set()
-        self.cycles_detected = []
+        self.repository = repository # Источник данных о пакетах
+        self.max_depth = max_depth # Ограничение глубины поиска
+        self.filter_str = filter_str.lower() # Фильтр (приводим к нижнему регистру)
+        self.graph = DependencyGraph() # Граф для хранения зависимостей
+        self.visited = set() # Множество посещенных пакетов
+        self.cycles_detected = [] # Список обнаруженных циклов
 
+    # Проверяет, должен ли пакет быть включен в анализ
     def should_include_package(self, package_name: str) -> bool:
         if self.filter_str and self.filter_str in package_name.lower():
-            return False
-        return True
+            return False # Пропускаем пакет - он содержит фильтр
+        return True # Включаем пакет в анализ
 
+    # Основной метод анализа зависимостей, использует DFS для обхода графа зависимостей
     def analyze_dependencies(self, root_package: str) -> DependencyGraph:
         print(f"\nНачинаем анализ зависимостей для {root_package}...")
         print(f"   Максимальная глубина: {self.max_depth}")
         print(f"   Фильтр: '{self.filter_str}'" if self.filter_str else "   Фильтр: не используется")
 
-        stack = deque()
+        stack = deque() # Используем стек для DFS
         stack.append((root_package, 0))
 
-        while stack:
-            package_name, depth = stack.pop()
+        while stack: # Обход в глубину
+            package_name, depth = stack.pop() # Берем пакет из стека
 
-            if depth > self.max_depth:
+            if depth > self.max_depth: # Проверка глубины
                 print(f"   Пропускаем {package_name} (превышена глубина {self.max_depth})")
                 continue
 
-            if not self.should_include_package(package_name):
+            if not self.should_include_package(package_name): # Применение фильтра
                 print(f"   Пропускаем {package_name} (фильтр: '{self.filter_str}')")
                 continue
 
@@ -43,7 +46,7 @@ class DependencyAnalyzer:
                     print(f"   Обнаружен цикл с пакетом {package_name}")
                 continue
 
-            self.visited.add(package_name)
+            self.visited.add(package_name) # Обработка нового пакета
             print(f"   Анализируем {package_name} (глубина {depth})")
 
             try:
@@ -60,11 +63,11 @@ class DependencyAnalyzer:
                         print(f"      Пропускаем зависимость {dep_name} (фильтр)")
                         continue
 
-                    self.graph.add_dependency(package_name, dep_name)
+                    self.graph.add_dependency(package_name, dep_name) # Добавляем связь в граф
 
                     # Добавляем зависимость в стек для дальнейшего анализа
                     if dep_name not in self.visited:
-                        stack.append((dep_name, depth + 1))
+                        stack.append((dep_name, depth + 1)) # Добавляем зависимость в стек
                         print(f"      Добавляем зависимость: {dep_name}")
                     else:
                         print(f"      Зависимость {dep_name} уже анализировалась")
@@ -166,3 +169,29 @@ class DependencyAnalyzer:
                 self._display_tree(dep, visited.copy(), new_prefix, is_last_child)
 
         visited.remove(root)
+
+    # Визуализация графа зависимостей
+    def visualize_dependencies(self, root_package: str, ascii_tree: bool = False, generate_image: bool = False):
+        print(f"\nВИЗУАЛИЗАЦИЯ ГРАФА ЗАВИСИМОСТЕЙ {root_package}:")
+        visualizer = DependencyVisualizer(self.graph) # Создаем визуализатор
+
+        d2_code = visualizer.generate_d2_diagram(root_package) # Генерация D2 кода
+        print("\n1. ТЕКСТОВОЕ ПРЕДСТАВЛЕНИЕ НА D2:")
+        print(d2_code)
+
+        print("\n2. ГРАФИЧЕСКОЕ ПРЕДСТАВЛЕНИЕ:")
+        if generate_image:
+            visualizer.generate_and_display_image(root_package)
+        else:
+            print("D2 не установлен. Установите его для генерации изображений:")
+            print("   https://d2lang.com/tour/install")
+            print("\nD2 код для ручной визуализации:")
+            print(d2_code)
+
+        if ascii_tree:
+            print("\n3. ASCII-ДЕРЕВО:")
+            visualizer.display_ascii_tree(root_package)
+
+        print("\n4. СРАВНЕНИЕ С ИНСТРУМЕНТАМИ NPM:")
+        visualizer.compare_with_npm_tools()
+        print("=" * 60)
