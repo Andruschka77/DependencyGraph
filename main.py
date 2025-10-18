@@ -6,55 +6,15 @@ from NPMRepository import NPMRepository
 from FileRepository import FileRepository
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='Анализатор зависимостей пакетов'
-    )
-
-    parser.add_argument(
-        '--package',
-        type=str,
-        required=True,
-        help='Имя пакета для анализа (например: react, lodash, express)'
-    )
-
+    parser = argparse.ArgumentParser(description='Анализатор зависимостей пакетов')
+    parser.add_argument('--package', type=str, required=True, help='Имя пакета для анализа (например: react, lodash, express)')
     source_group = parser.add_mutually_exclusive_group(required=True)
-    source_group.add_argument(
-        '--url',
-        type=str,
-        help='URL репозитория (например: https://registry.npmjs.org)'
-    )
-    source_group.add_argument(
-        '--file',
-        type=str,
-        help='Путь к файлу с тестовыми данными (например: test_repo.json)'
-    )
-
-    parser.add_argument(
-        '--test-mode',
-        action='store_true',
-        help='Включить тестовый режим работы'
-    )
-
-    parser.add_argument(
-        '--max-depth',
-        type=int,
-        default=5,
-        help='Максимальная глубина поиска зависимостей (по умолчанию: 5)'
-    )
-
-    parser.add_argument(
-        '--filter',
-        type=str,
-        default='',
-        help='Фильтровать пакеты по названию (например: "test" чтобы исключить тестовые пакеты)'
-    )
-
-    # НОВЫЙ АРГУМЕНТ ДЛЯ ЭТАПА 4
-    parser.add_argument(
-        '--load-order',
-        action='store_true',
-        help='Показать порядок загрузки зависимостей (этап 4)'
-    )
+    source_group.add_argument('--url', type=str, help='URL репозитория (например: https://registry.npmjs.org)')
+    source_group.add_argument('--file', type=str, help='Путь к файлу с тестовыми данными (например: test_repo.json)')
+    parser.add_argument('--test-mode', action='store_true', help='Включить тестовый режим работы')
+    parser.add_argument('--max-depth', type=int, default=5, help='Максимальная глубина поиска зависимостей')
+    parser.add_argument('--filter', type=str, default='', help='Фильтровать пакеты по названию (например: "test" чтобы исключить тестовые пакеты)')
+    parser.add_argument('--load-order', action='store_true', help='Показать порядок загрузки зависимостей')
 
     try:
         args = parser.parse_args()
@@ -135,7 +95,6 @@ def main():
         print(f"\nОшибка при построении графа: {e}")
         print("=" * 50)
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
